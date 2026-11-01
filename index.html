@@ -70,6 +70,33 @@ h2{color:var(--pink);font-size:22px;letter-spacing:.5px}
 .lgbody{margin-top:-78px;position:relative}
 .lglogo{display:block;width:120px;height:120px;border-radius:50%;border:3px solid var(--pink);margin:0 auto;box-shadow:0 0 30px rgba(212,175,55,.55)}
 .lgname{font-size:36px;text-align:center;margin:10px 0 4px}
+
+.bar{position:sticky;top:0;z-index:5;background:rgba(14,15,18,.88);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);margin:-20px -16px 12px;padding:12px 16px;border-bottom:1px solid #3b3c42}
+.bar+.pole{margin-top:0}
+.badge{font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;background:var(--pink);color:#1a1a1a;padding:2px 8px;border-radius:99px;margin-left:4px;vertical-align:middle}
+h2{display:flex;align-items:center;gap:0}
+h2::after{content:"";flex:1;height:1px;margin-left:12px;background:linear-gradient(90deg,#6a5726,transparent)}
+h2[style*="center"]::after{display:none}
+.n{font-style:normal;display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:linear-gradient(160deg,#f3d577,#a67b22);color:#1b1407;font:800 16px Barlow,sans-serif;margin-right:10px;flex:none}
+.opt{display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;min-height:58px}
+.opt .pr{margin-left:auto;color:#f3d577;font-weight:800}
+.opt small{flex-basis:100%}
+.av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(160deg,#f3d577,#a67b22);color:#1b1407;font:700 18px Cinzel,Georgia,serif;flex:none}
+.grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+input,select{background:#1a1b20;border-radius:10px;min-height:48px}
+input[type=date]{color-scheme:dark}
+.slots{grid-template-columns:repeat(auto-fill,minmax(74px,1fr))}
+.slot{border-radius:99px;padding:10px 0;font-weight:700}
+.stick{position:sticky;bottom:0;margin:22px -16px -60px;padding:14px 16px calc(14px + env(safe-area-inset-bottom,0px));background:linear-gradient(180deg,transparent,var(--bg) 30%);display:flex;gap:14px;align-items:center}
+.stick .btn{flex:1}.stick .total{font-size:26px;line-height:1.1}.stick .err{margin:0}
+.okc{width:78px;height:78px;border-radius:50%;margin:14px auto 0;display:grid;place-items:center;font-size:42px;background:linear-gradient(160deg,#3fd47c,#1f8f4e);color:#fff;box-shadow:0 0 32px rgba(63,212,124,.45)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
+.stats div{background:linear-gradient(160deg,#27282f,#1a1b20);border:1px solid #6a5726;border-radius:14px;padding:12px 6px;text-align:center}
+.stats b{display:block;font:700 22px Cinzel,Georgia,serif;color:#f3d577}.stats small{color:var(--mut);font-size:12px}
+.bk .top{justify-content:flex-start;gap:12px}
+.bk .tm{font:700 22px Cinzel,Georgia,serif;color:#f3d577;background:rgba(0,0,0,.3);border:1px solid #6a5726;border-radius:10px;padding:4px 10px}
+.bk .cn{flex:1;font-size:18px}
+.card>b:first-child{display:block;font:700 18px Cinzel,Georgia,serif;color:var(--pink);margin-bottom:8px}
 </style>
 </head>
 <body>
@@ -107,25 +134,25 @@ function render(){
   a.innerHTML=head()+(!user?login():admin?adminView():client());
   bind();
 }
-function head(){if(!user)return "";return `<div class="top bar"><div class="brand"><img src="${LOGO}" alt="Grafity Artes"><div><div class="logo gold">Grafity Artes</div><div class="tag" style="margin:2px 0 0">Olá, ${esc(user)}</div></div></div><button class="link" data-a="out">Sair</button></div><div class="pole" style="margin-bottom:6px"></div>`}
+function head(){if(!user)return "";return `<div class="top bar"><div class="brand"><img src="${LOGO}" alt="Grafity Artes"><div><div class="logo gold">Grafity Artes</div><div class="tag" style="margin:2px 0 0">Olá, ${esc(user)} <span class="badge">${admin?(me&&me.role=="barbeiro"?"Barbeiro":"Dono"):"Cliente"}</span></div></div></div><button class="link" data-a="out">Sair</button></div><div class="pole" style="margin-bottom:6px"></div>`}
 function client(){
   if(done)return confirmView();
   const sv=svc(B.s),tot=B.s?sv.price:0;
-  let h=`<h2>Seu agendamento</h2>`;
-  h+=`<p>Escolha abaixo e confirme. É rápido.</p>`;
-  h+=`<h2>1. Serviço</h2><div class="grid">${S.services.map(s=>`<button class="opt ${B.s==s.id?"on":""}" data-s="${s.id}"><b>${esc(s.name)}</b><small>${R(s.price)} · ${s.min} min</small></button>`).join("")}</div>`;
-  h+=`<h2>2. Barbeiro</h2><div class="grid">${S.barbers.map(b=>`<button class="opt ${B.b==b.id?"on":""}" data-b="${b.id}"><b>${esc(b.name)}</b></button>`).join("")}</div>`;
-  h+=`<h2>3. Dia e horário</h2><input type="date" id="cd" min="${today()}" value="${B.d||""}">`;
+  let h=`<h2 style="margin-top:6px">Monte seu horário</h2>`;
+  h+=`<p class="note">Escolha o serviço, o barbeiro e o horário. É rápido.</p>`;
+  h+=`<h2><i class="n">1</i>Serviço</h2><div class="grid">${S.services.map(s=>`<button class="opt ${B.s==s.id?"on":""}" data-s="${s.id}"><b>${esc(s.name)}</b><span class="pr">${R(s.price)}</span><small>${s.min} min</small></button>`).join("")}</div>`;
+  h+=`<h2><i class="n">2</i>Barbeiro</h2><div class="grid">${S.barbers.map(b=>`<button class="opt ${B.b==b.id?"on":""}" data-b="${b.id}"><span class="av">${esc(b.name.trim().charAt(0).toUpperCase())}</span><b>${esc(b.name)}</b></button>`).join("")}</div>`;
+  h+=`<h2><i class="n">3</i>Dia e horário</h2><input type="date" id="cd" min="${today()}" value="${B.d||""}">`;
   if(B.b&&B.d)h+=`<div class="slots">${HOURS.map(t=>{const tk=taken(B.b,B.d,t)||(B.d==today()&&t<=new Date().toTimeString().slice(0,5));return `<button class="slot ${B.t==t?"on":""}" data-t="${t}" ${tk?"disabled":""}>${t}</button>`}).join("")}</div>`;
   else h+=`<p class="note">Escolha o barbeiro e o dia para ver os horários livres.</p>`;
-  h+=`<h2>4. Pagamento</h2><div class="grid">${PAY.map(p=>`<button class="opt ${B.p==p?"on":""}" data-p="${p}"><b>${p}</b></button>`).join("")}</div>`;
+  h+=`<h2><i class="n">4</i>Pagamento</h2><div class="grid">${PAY.map(p=>`<button class="opt ${B.p==p?"on":""}" data-p="${p}"><b>${p}</b></button>`).join("")}</div>`;
   h+=`<div class="card" style="margin-top:20px"><div class="sum"><span>Serviço</span><b>${B.s?esc(sv.name):"—"}</b></div><div class="sum"><span>Barbeiro</span><b>${B.b?esc(bar(B.b).name):"—"}</b></div><div class="sum"><span>Quando</span><b>${B.d&&B.t?fmt(B.d)+" às "+B.t:"—"}</b></div><div class="sum"><span>Pagamento</span><b>${B.p||"—"}</b></div><div class="sum" style="border:0"><span>Total</span><span class="total">${R(tot)}</span></div></div>`;
-  h+=`<p class="err">${esc(msg)}</p><button class="btn" data-a="book">Confirmar agendamento</button>`;
+  h+=`<p class="err">${esc(msg)}</p><div class="stick"><div><div class="note">Total</div><div class="total">${R(tot)}</div></div><button class="btn" data-a="book">Confirmar agendamento</button></div>`;
   return h;
 }
 function waText(x){return `Olá, Grafity Artes! Novo agendamento:\n• Cliente: ${x.client} (${x.phone})\n• Serviço: ${svc(x.service).name} – ${R(svc(x.service).price)}\n• Barbeiro: ${bar(x.barber).name}\n• Data: ${fmt(x.date)} às ${x.time}\n• Pagamento: ${x.pay}`}
 function waLink(x){return "https://wa.me/"+S.wa.replace(/\D/g,"")+"?text="+encodeURIComponent(waText(x))}
-function confirmView(){const x=done;return `<h2>Horário reservado!</h2><div class="card"><div class="sum"><span>Serviço</span><b>${esc(svc(x.service).name)}</b></div><div class="sum"><span>Barbeiro</span><b>${esc(bar(x.barber).name)}</b></div><div class="sum"><span>Quando</span><b>${fmt(x.date)} às ${x.time}</b></div><div class="sum"><span>Pagamento</span><b>${x.pay}</b></div><div class="sum" style="border:0"><span>Total</span><span class="total">${R(svc(x.service).price)}</span></div></div>
+function confirmView(){const x=done;return `<div class="okc">✓</div><h2 style="justify-content:center">Horário reservado!</h2><div class="card"><div class="sum"><span>Serviço</span><b>${esc(svc(x.service).name)}</b></div><div class="sum"><span>Barbeiro</span><b>${esc(bar(x.barber).name)}</b></div><div class="sum"><span>Quando</span><b>${fmt(x.date)} às ${x.time}</b></div><div class="sum"><span>Pagamento</span><b>${x.pay}</b></div><div class="sum" style="border:0"><span>Total</span><span class="total">${R(svc(x.service).price)}</span></div></div>
 ${x.sent?"<p>A barbearia já recebeu o seu agendamento no WhatsApp.</p>":"<p>Falta um passo: envie a mensagem para o WhatsApp da barbearia.</p>"}<a href="${waLink(x)}" target="_blank" rel="noopener"><button class="btn alt">Enviar no WhatsApp</button></a><p class="err">${esc(msg)}</p><button class="btn ghost" data-a="new">Novo agendamento</button>`}
 
 function login(){return `<section class="lg"><div class="lgtop"><img class="lgimg" src="${FOTO}" alt=""><div class="lgfade"></div></div><div class="lgbody"><img class="lglogo" src="${LOGO}" alt="Grafity Artes"><h1 class="gold lgname">Grafity Artes</h1><div class="pole"></div><div class="card"><label for="ln">Seu nome</label><input id="ln" autocomplete="name" value="${esc(B.ln||"")}"><label for="ls">WhatsApp</label><input id="ls" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="(62) 99999-9999"><p class="err">${esc(msg)}</p><button class="btn" data-a="in">Entrar</button></div></div></section>`}
@@ -134,9 +161,10 @@ function adminView(){
   const owner=!!me&&(!me.role||me.role=="dono"),bf=owner?fAdm.barber:(me&&me.barber)||"none";const list=S.bookings.filter(x=>x.date==fAdm.date&&(!bf||x.barber==bf)).sort((a,b)=>a.time<b.time?-1:1);
   let h=`<h2>${owner?"Agenda":"Seus clientes"}</h2>
 <div class="row"><div><label>Dia</label><input type="date" id="fd" value="${fAdm.date}"></div><div ${owner?"":"hidden"}><label>Barbeiro</label><select id="fb"><option value="">Todos</option>${S.barbers.map(b=>`<option value="${b.id}" ${fAdm.barber==b.id?"selected":""}>${esc(b.name)}</option>`).join("")}</select></div></div>`;
-  h+=list.length?list.map(x=>`<div class="card"><div class="top"><b>${x.time} · ${esc(x.client)}</b><span class="st ${x.status=="cancelado"?"x":x.status=="concluído"?"ok":""}">${x.status}</span></div><div>${esc(x.serviceName||"")} · ${R(x.price)} · ${esc(x.pay)}</div><div class="note">Barbeiro: ${esc(x.barberName||"")} · <a href="https://wa.me/${x.phone.replace(/\D/g,"").replace(/^(\d{10,11})$/,"55$1")}" target="_blank" rel="noopener">${esc(x.phone)}</a></div><div class="row" style="margin-top:8px"><button class="btn alt" data-ok="${x.id}">Concluir</button><button class="btn ghost" data-cx="${x.id}">Cancelar</button></div></div>`).join(""):`<p class="note">Nenhum agendamento neste dia.</p>`;
+  h+=`<div class="stats"><div><b>${list.filter(x=>x.status=="agendado").length}</b><small>Agendados</small></div><div><b>${list.filter(x=>x.status=="concluído").length}</b><small>Concluídos</small></div><div><b>${R(list.filter(x=>x.status=="concluído").reduce((s,x)=>s+x.price,0))}</b><small>Faturado</small></div></div>`;
+  h+=list.length?list.map(x=>`<div class="card bk"><div class="top"><div class="tm">${x.time}</div><b class="cn">${esc(x.client)}</b><span class="st ${x.status=="cancelado"?"x":x.status=="concluído"?"ok":""}">${x.status}</span></div><div>${esc(x.serviceName||"")} · ${R(x.price)} · ${esc(x.pay)}</div><div class="note">Barbeiro: ${esc(x.barberName||"")} · <a href="https://wa.me/${x.phone.replace(/\D/g,"").replace(/^(\d{10,11})$/,"55$1")}" target="_blank" rel="noopener">${esc(x.phone)}</a></div><div class="row" style="margin-top:8px"><button class="btn alt" data-ok="${x.id}">Concluir</button><button class="btn ghost" data-cx="${x.id}">Cancelar</button></div></div>`).join(""):`<p class="note">Nenhum agendamento neste dia.</p>`;
   const rec=S.bookings.filter(x=>x.status=="concluído"&&x.date==fAdm.date&&(!bf||x.barber==bf)).reduce((s,x)=>s+x.price,0);
-  h+=`<div class="card"><b>Faturado no dia (concluídos): ${R(rec)}</b></div>`;
+  
   if(owner){h+=`<h2>Configurações</h2><p class="err">${esc(msg)}</p><div class="card"><label>WhatsApp da loja (com 55 + DDD)</label><input id="sw" value="${esc(S.wa)}" inputmode="tel"><button class="btn" data-a="cfg">Salvar</button></div>`;
   h+=`<div class="card"><b>Barbeiros</b>${S.barbers.map(b=>`<div class="sum"><span>${esc(b.name)}</span><button class="link" data-rb="${b.id}">remover</button></div>`).join("")}<div class="row" style="margin-top:10px"><input id="nb" placeholder="Nome do barbeiro"><button class="btn" style="flex:0 0 auto;width:auto" data-a="ab">Adicionar</button></div><p class="err">${esc(msg)}</p></div>`;
   h+=`<div class="card"><b>Serviços e preços</b>${S.services.map(s=>`<div class="sum"><span>${esc(s.name)} · ${R(s.price)}</span><button class="link" data-rs="${s.id}">remover</button></div>`).join("")}<div class="row" style="margin-top:10px"><input id="ns" placeholder="Serviço"><input id="np" placeholder="Preço" inputmode="decimal"><button class="btn" style="flex:0 0 auto;width:auto" data-a="as">Adicionar</button></div><p class="err">${esc(msg)}</p></div>`;
