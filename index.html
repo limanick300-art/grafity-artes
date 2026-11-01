@@ -89,6 +89,9 @@ h1{font-size:60px;line-height:.95;letter-spacing:2px;margin:14px 0 4px}h1 em{col
 .li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px dashed var(--line)}
 .li button{background:none;border:0;color:var(--red);font-weight:800;text-decoration:underline;padding:6px}
 .addrow{display:grid;gap:8px;margin-top:12px}.addrow input,.addrow select{margin:0}.addrow .btn{margin:0}
+input[type=checkbox]{width:22px;min-height:22px;height:22px;margin:0;accent-color:var(--red);flex:none}
+.hrow{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.9fr) auto minmax(0,.9fr);gap:8px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)}
+.hrow select{margin:0;min-height:44px;padding:0 4px}.dn{display:flex;gap:8px;align-items:center;text-transform:none;font-size:15px;letter-spacing:0}
 </style>
 </head>
 <body>
@@ -113,12 +116,18 @@ const bar=id=>S.barbers.find(x=>x.id==id)||{name:"?"};
 
 const api=async(m,u,b)=>{const r=await fetch(u,{method:m,headers:{"Content-Type":"application/json"},body:b?JSON.stringify(b):undefined});let d={};try{d=await r.json()}catch(e){}if(!r.ok)throw Object.assign(new Error(d.error||"Erro"),{status:r.status});return d};
 const bq=()=>"/api/admin/bookings?date="+fAdm.date+(fAdm.barber?"&barber="+fAdm.barber:"");
-async function loadCfg(){const c=await api("GET","/api/config");S.wa=c.wa;S.barbers=c.barbers;S.services=c.services}
+async function loadCfg(){const c=await api("GET","/api/config");S.wa=c.wa;S.barbers=c.barbers;S.services=c.services;S.hours=c.hours}
 async function loadBookings(){S.bookings=(await api("GET",bq())).bookings}
-async function loadAdmin(){const a=await api("GET","/api/admin/state");S.wa=a.wa;S.barbers=a.barbers;S.services=a.services;S.admins=a.admins;me={role:a.owner?"dono":"barbeiro",barber:a.barber};await loadBookings()}
-async function loadSlots(){S.bookings=B.b&&B.d?(await api("GET","/api/slots?barber="+B.b+"&date="+B.d)).slots:[]}
-async function save(){try{await api("PUT","/api/admin/config",{wa:S.wa,barbers:S.barbers,services:S.services});await loadAdmin()}catch(e){msg="Não foi possível salvar. Confira os dados."}}
+async function loadAdmin(){const a=await api("GET","/api/admin/state");S.wa=a.wa;S.barbers=a.barbers;S.services=a.services;S.hours=a.hours;S.admins=a.admins;me={role:a.owner?"dono":"barbeiro",barber:a.barber};await loadBookings()}
+async function loadSlots(){try{S.bookings=B.b&&B.d?(await api("GET","/api/slots?barber="+B.b+"&date="+B.d)).slots:[]}catch(e){S.bookings=[];msg="Não foi possível conferir os horários ocupados. Toque no barbeiro de novo."}}
+async function save(){try{await api("PUT","/api/admin/config",{wa:S.wa,barbers:S.barbers,services:S.services,hours:DH()});await loadAdmin()}catch(e){msg="Não foi possível salvar. Confira os dados."}}
 async function init(){try{await loadCfg();const m=await api("GET","/api/me");user=m.name;admin=m.role=="admin";if(admin)await loadAdmin();else B={name:m.name,phone:m.phone}}catch(e){}render()}
+const DN=["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+const DH=()=>S.hours&&S.hours.length==7?S.hours:[0,1,2,3,4,5,6].map(()=>({on:true,open:"07:30",close:"22:00"}));
+const tmin=t=>+t.slice(0,2)*60+ +t.slice(3);
+const hhmm=m=>String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0");
+function slotsFor(d){const x=DH()[new Date(d+"T12:00:00").getDay()],o=[];if(!x||!x.on)return o;for(let m=tmin(x.open);m<tmin(x.close);m+=30)o.push(hhmm(m));return o}
+const TO=v=>{let o="";for(let m=360;m<=1410;m+=30){const t=hhmm(m);o+=`<option ${t==v?"selected":""}>${t}</option>`}return o};
 function taken(b,d,t){return S.bookings.some(x=>x.barber==b&&x.date==d&&x.time==t&&x.status!="cancelado")}
 
 function render(){
@@ -135,8 +144,8 @@ function client(){
   h+=`<h2><i class="n">1</i>Serviço</h2><div class="tiles">${S.services.map(s=>`<button class="tile ${B.s==s.id?"on":""}" data-s="${s.id}"><span class="tn">${esc(s.name)}</span><span class="tp">${R(s.price)}</span><span class="tm">${s.min} min</span></button>`).join("")}</div>`;
   h+=`<h2><i class="n">2</i>Barbeiro</h2><div class="tiles">${S.barbers.map(b=>`<button class="tile bt ${B.b==b.id?"on":""}" data-b="${b.id}"><span class="av">${esc(b.name.trim().charAt(0).toUpperCase())}</span><span class="tn">${esc(b.name)}</span></button>`).join("")}</div>`;
   h+=`<h2><i class="n">3</i>Dia e horário</h2><input type="date" id="cd" min="${today()}" value="${B.d||""}">`;
-  if(B.b&&B.d)h+=`<div class="slots">${HOURS.map(t=>{const tk=taken(B.b,B.d,t)||(B.d==today()&&t<=new Date().toTimeString().slice(0,5));return `<button class="slot ${B.t==t?"on":""}" data-t="${t}" ${tk?"disabled":""}>${t}</button>`}).join("")}</div>`;
-  else h+=`<p class="note">Escolha o barbeiro e o dia para ver os horários livres.</p>`;
+  if(B.d){const L=slotsFor(B.d);h+=!L.length?`<p class="note">A barbearia não abre neste dia. Escolha outro dia.</p>`:!B.b?`<p class="note">Agora escolha o barbeiro (passo 2) para ver os horários livres.</p>`:`<div class="slots">${L.map(t=>{const tk=taken(B.b,B.d,t)||(B.d==today()&&t<=new Date().toTimeString().slice(0,5));return `<button class="slot ${B.t==t?"on":""}" data-t="${t}" ${tk?"disabled":""}>${t}</button>`}).join("")}</div>`}
+  else h+=`<p class="note">Escolha o dia para ver os horários.</p>`;
   h+=`<h2><i class="n">4</i>Pagamento</h2><div class="tiles">${PAY.map(p=>`<button class="tile bt ${B.p==p?"on":""}" data-p="${p}"><span class="tn">${PI[p]||""} ${p}</span></button>`).join("")}</div>`;
   h+=`<div class="resumo"><div class="r2"><span>Serviço</span><b>${B.s?esc(sv.name):"—"}</b></div><div class="r2"><span>Barbeiro</span><b>${B.b?esc(bar(B.b).name):"—"}</b></div><div class="r2"><span>Quando</span><b>${B.d&&B.t?fmt(B.d)+" às "+B.t:"—"}</b></div><div class="r2"><span>Pagamento</span><b>${B.p||"—"}</b></div></div>`;
   h+=`<p class="err">${esc(msg)}</p><div class="dock"><div><small>TOTAL</small><b>${R(tot)}</b></div><button class="btn" data-a="book">Confirmar</button></div>`;
@@ -160,7 +169,8 @@ function adminView(){
     h+=list.length?list.map(x=>{const c={agendado:"ag",concluído:"ok",cancelado:"cx"}[x.status]||"ag";return `<article class="bk ${c}"><div class="t">${x.time}</div><div class="bd"><div class="l1"><b>${esc(x.client)}</b><span class="st ${c=="cx"?"x":c=="ok"?"ok":""}">${x.status}</span></div><div class="l2">${esc(x.serviceName||"")} · <b>${R(x.price)}</b></div><div class="l3"><span class="pay">${esc(x.pay)}</span>${owner?`<span class="pay">${esc(x.barberName||"")}</span>`:""}<a class="wa" href="https://wa.me/${x.phone.replace(/\D/g,"").replace(/^(\d{10,11})$/,"55$1")}" target="_blank" rel="noopener">WhatsApp</a></div>${x.status=="agendado"?`<div class="acts"><button class="btn green sm" data-ok="${x.id}">Concluir</button><button class="btn ghost sm" data-cx="${x.id}">Cancelar</button></div>`:""}</div></article>`}).join(""):`<div class="empty">Nenhum agendamento neste dia.</div>`;
   }else{
     h+=`<p class="err">${esc(msg)}</p><h2>WhatsApp da loja</h2><div class="panel"><label>Número (55 + DDD + número)</label><input id="sw" value="${esc(S.wa)}" inputmode="tel"><button class="btn" data-a="cfg">Salvar</button></div>`;
-    h+=`<h2>Barbeiros</h2><div class="panel">${S.barbers.map(b=>`<div class="li"><span>${esc(b.name)}</span><button data-rb="${b.id}">remover</button></div>`).join("")}<div class="addrow"><input id="nb" placeholder="Nome do barbeiro"><button class="btn" data-a="ab">Adicionar barbeiro</button></div></div>`;
+    h+=`<h2>Horário de funcionamento</h2><div class="panel">${DH().map((d,i)=>`<div class="hrow"><label class="dn"><input type="checkbox" id="hon${i}" ${d.on?"checked":""}> ${DN[i]}</label><select id="ho${i}">${TO(d.open)}</select><span>às</span><select id="hc${i}">${TO(d.close)}</select></div>`).join("")}<p class="note">Desmarque o dia em que a barbearia fecha. O último horário para agendar começa 30 minutos antes de fechar.</p><button class="btn" data-a="hrs">Salvar horários</button></div>
+    <h2>Barbeiros</h2><div class="panel">${S.barbers.map(b=>`<div class="li"><span>${esc(b.name)}</span><button data-rb="${b.id}">remover</button></div>`).join("")}<div class="addrow"><input id="nb" placeholder="Nome do barbeiro"><button class="btn" data-a="ab">Adicionar barbeiro</button></div></div>`;
     h+=`<h2>Serviços e preços</h2><div class="panel">${S.services.map(s=>`<div class="li"><span>${esc(s.name)} · <b>${R(s.price)}</b></span><button data-rs="${s.id}">remover</button></div>`).join("")}<div class="addrow"><input id="ns" placeholder="Serviço"><input id="np" placeholder="Preço, ex.: 35,50" inputmode="decimal"><button class="btn" data-a="as">Adicionar serviço</button></div></div>`;
     h+=`<h2>Logins da equipe</h2><div class="panel"><p class="note">Quem tem login aqui entra como equipe. Senha com 8 caracteres ou mais, com letras e números. Remova quem sair.</p>${S.admins.map(a=>`<div class="li"><span>${esc(a.name)} <small class="note">(${a.role=="barbeiro"?"barbeiro: "+esc(bar(a.barber).name):"dono"})</small></span><button data-ra="${esc(a.name)}">remover</button></div>`).join("")}<div class="addrow"><input id="an" placeholder="Nome de login"><input id="ap" type="password" placeholder="Senha" autocomplete="new-password"><select id="av"><option value="">Dono (acesso total)</option>${S.barbers.map(b=>`<option value="${b.id}">Barbeiro: ${esc(b.name)}</option>`).join("")}</select><button class="btn" data-a="aa">Adicionar login</button></div></div>`;
   }
@@ -184,6 +194,8 @@ function bind(){
       if(!B.name||!B.phone||!B.s||!B.b||!B.d||!B.t||!B.p){msg="Preencha nome, WhatsApp, serviço, barbeiro, horário e pagamento."}
       else if(taken(B.b,B.d,B.t)){msg="Esse horário acabou de ser ocupado. Escolha outro.";B.t=""}
       else{try{done=(await api("POST","/api/book",{service:B.s,barber:B.b,date:B.d,time:B.t,pay:B.p})).booking}catch(err){if(err.status==409){msg="Esse horário acabou de ser ocupado. Escolha outro.";B.t="";await loadSlots()}else msg="Não foi possível agendar. Tente de novo."}}}
+    else if(a=="hrs"){const hs=[0,1,2,3,4,5,6].map(i=>({on:$("hon"+i).checked,open:$("ho"+i).value,close:$("hc"+i).value}));
+      if(hs.some(x=>x.on&&tmin(x.open)>=tmin(x.close)))msg="Em cada dia aberto, o fechamento precisa ser depois da abertura.";else{S.hours=hs;await save()}}
     else if(a=="cfg"){S.wa=$("sw").value.replace(/\D/g,"")||S.wa;await save()}
     else if(a=="aa"){try{await api("POST","/api/admin/users",{name:$("an").value.trim(),pass:$("ap").value,barber:$("av").value});await loadAdmin()}catch(err){msg=err.message}}
     else if(a=="ab"){const v=$("nb").value.trim();if(!v)msg="Digite o nome do barbeiro.";else{S.barbers.push({id:uid(),name:v});await save()}}

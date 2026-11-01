@@ -11,7 +11,16 @@ const pool = new Pool({ connectionString: DBURL, max: 5, ssl: /localhost|127\.0\
 const q = (sql, args) => pool.query(sql, args).then(r => r.rows);
 
 const PAY = ["Pix", "Cartão de crédito", "Cartão de débito", "Dinheiro"];
-const HOURS = []; for (let h = 9; h < 19; h++) HOURS.push(String(h).padStart(2, "0") + ":00", String(h).padStart(2, "0") + ":30");
+const TM = /^([01]\d|2[0-3]):(00|30)$/;
+const toMin = t => parseInt(t.slice(0, 2)) * 60 + parseInt(t.slice(3));
+const DEF_HOURS = Array.from({ length: 7 }, () => ({ on: true, open: "07:30", close: "22:00" }));
+const getHours = async () => { const r = await q("SELECT v FROM settings WHERE k='hours'"); try { return JSON.parse(r[0].v); } catch (e) { return DEF_HOURS; } };
+const slotsFor = (hours, date) => {
+  const d = hours[new Date(date + "T12:00:00").getDay()], out = [];
+  if (!d || !d.on) return out;
+  for (let m = toMin(d.open); m < toMin(d.close); m += 30) out.push(String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"));
+  return out;
+};
 const DUMMY = bcrypt.hashSync("dummy-password", 12);
 const ID = /^[a-z0-9]{1,20}$/, DATE = /^\d{4}-\d{2}-\d{2}$/;
 const getWa = async () => (await q("SELECT v FROM settings WHERE k='wa'"))[0].v;
@@ -36,6 +45,7 @@ async function setup() {
       await q("INSERT INTO services VALUES($1,$2,$3,$4,1) ON CONFLICT DO NOTHING", [i, nm, pr, m]);
   }
   await q("INSERT INTO settings VALUES('wa',$1) ON CONFLICT DO NOTHING", [(process.env.SHOP_WHATSAPP || "5562900000000").replace(/\D/g, "")]);
+  await q("INSERT INTO settings VALUES('hours',$1) ON CONFLICT DO NOTHING", [JSON.stringify(DEF_HOURS)]);
 }
 
 const app = express();
@@ -85,14 +95,14 @@ app.get("/api/me", need(), (req, res) => res.json(req.s));
 app.post("/api/logout", (req, res) => { res.clearCookie("ga"); res.json({ ok: true }); });
 
 // ---- público (logado) ----
-const cfg = async () => ({ wa: await getWa(),
+const cfg = async () => ({ wa: await getWa(), hours: await getHours(),
   barbers: await q("SELECT id,name FROM barbers WHERE active=1 ORDER BY name"),
   services: await q("SELECT id,name,price,min FROM services WHERE active=1 ORDER BY price") });
 app.get("/api/config", wrap(async (req, res) => res.json(await cfg())));
 app.get("/api/slots", need(), wrap(async (req, res) => {
   const { barber, date } = req.query;
   if (!ID.test(barber || "") || !DATE.test(date || "")) return res.status(400).json({ error: "dados" });
-  res.json({ slots: await q("SELECT barber,date,time,status FROM bookings WHERE barber=$1 AND date=$2 AND status<>'cancelado'", [barber, date]) });
+  res.json({ slots: await q(`SELECT barber,"date","time",status FROM bookings WHERE barber=$1 AND "date"=$2 AND status<>'cancelado'`, [barber, date]) });
 }));
 
 async function notifyShop(b, svc, bar) {
@@ -116,8 +126,8 @@ app.post("/api/book", need(), wrap(async (req, res) => {
   const { service, barber, date, time, pay } = req.body || {};
   const svc = (await q("SELECT * FROM services WHERE id=$1 AND active=1", [String(service)]))[0];
   const bar = (await q("SELECT * FROM barbers WHERE id=$1 AND active=1", [String(barber)]))[0];
-  const now = new Date(), today = now.toLocaleDateString("sv-SE");
-  if (!svc || !bar || !DATE.test(date || "") || !HOURS.includes(time) || !PAY.includes(pay) || date < today ||
+  const now = new Date(), today = now.toLocaleDateString("sv-SE"), hours = await getHours();
+  if (!svc || !bar || !DATE.test(date || "") || !slotsFor(hours, date).includes(time) || !PAY.includes(pay) || date < today ||
       (date === today && time <= now.toTimeString().slice(0, 5))) return res.status(400).json({ error: "dados" });
   const b = { id: crypto.randomUUID().slice(0, 8), client: req.s.name, phone: req.s.phone || "", service: svc.id, barber: bar.id, date, time, pay, price: svc.price };
   try {
@@ -153,16 +163,18 @@ app.patch("/api/admin/bookings/:id", admin, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 app.put("/api/admin/config", admin, ownerOnly, wrap(async (req, res) => {
-  const { wa, barbers, services } = req.body || {};
+  const { wa, barbers, services, hours } = req.body || {};
+  const okH = Array.isArray(hours) && hours.length === 7 && hours.every(x => x && typeof x.on === "boolean" && TM.test(x.open) && TM.test(x.close) && (!x.on || toMin(x.open) < toMin(x.close)));
   const w = String(wa || "").replace(/\D/g, "");
   const okB = Array.isArray(barbers) && barbers.length >= 1 && barbers.length <= 50 && barbers.every(x => ID.test(x.id) && String(x.name || "").trim());
   const okS = Array.isArray(services) && services.length >= 1 && services.length <= 50 &&
     services.every(x => ID.test(x.id) && String(x.name || "").trim() && Number(x.price) >= 0 && Number(x.price) < 100000);
-  if (w.length < 10 || w.length > 15 || !okB || !okS) return res.status(400).json({ error: "dados" });
+  if (w.length < 10 || w.length > 15 || !okB || !okS || !okH) return res.status(400).json({ error: "dados" });
   const c = await pool.connect();
   try {
     await c.query("BEGIN");
     await c.query("UPDATE settings SET v=$1 WHERE k='wa'", [w]);
+    await c.query("UPDATE settings SET v=$1 WHERE k='hours'", [JSON.stringify(hours.map(x => ({ on: x.on, open: x.open, close: x.close })))]);
     await c.query("UPDATE barbers SET active=0"); await c.query("UPDATE services SET active=0");
     for (const b of barbers) await c.query("INSERT INTO barbers VALUES($1,$2,1) ON CONFLICT(id) DO UPDATE SET name=excluded.name, active=1", [b.id, String(b.name).trim().slice(0, 40)]);
     for (const s of services) await c.query("INSERT INTO services VALUES($1,$2,$3,$4,1) ON CONFLICT(id) DO UPDATE SET name=excluded.name, price=excluded.price, min=excluded.min, active=1",
